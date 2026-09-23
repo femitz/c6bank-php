@@ -40,6 +40,10 @@ final readonly class CreateBolepixRequest
                 'deve conter exatamente 26 caracteres alfanuméricos maiúsculos (A-Z, 0-9), ex.: um ULID.',
             );
         }
+
+        if ($this->amount <= 1) {
+            throw InvalidConfigurationException::forInvalidValue('amount', 'deve ser maior que R$ 1,00.');
+        }
     }
 
     /**

@@ -8,6 +8,7 @@ use Femitz\C6BankPhp\Bolepix\Fees;
 use Femitz\C6BankPhp\Bolepix\PaymentMethod;
 use Femitz\C6BankPhp\Bolepix\UpdateBolepixRequest;
 use Femitz\C6BankPhp\Bolepix\UpdatePayerOptions;
+use Femitz\C6BankPhp\Exceptions\InvalidConfigurationException;
 
 it('converts every field to the array shape expected by the api', function (): void {
     $request = new UpdateBolepixRequest(
@@ -64,4 +65,16 @@ it('omits fees, payer and payment_method when they have no fields set', function
         ->not->toHaveKey('payer')
         ->not->toHaveKey('fees')
         ->not->toHaveKey('payment_method');
+});
+
+it('rejects an amount that is not greater than 1', function (float $amount): void {
+    new UpdateBolepixRequest(amount: $amount);
+})->throws(InvalidConfigurationException::class, 'O campo "amount" é inválido: deve ser maior que R$ 1,00.')->with([
+    'zero' => [0.0],
+    'negative' => [-10.0],
+    'exactly one' => [1.0],
+]);
+
+it('allows omitting the amount entirely', function (): void {
+    expect(fn (): UpdateBolepixRequest => new UpdateBolepixRequest(description: 'Sem valor'))->not->toThrow(InvalidConfigurationException::class);
 });

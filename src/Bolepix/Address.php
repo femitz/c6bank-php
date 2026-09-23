@@ -9,13 +9,17 @@ namespace Femitz\C6BankPhp\Bolepix;
  */
 final readonly class Address
 {
+    public string $zipCode;
+
     public function __construct(
         public string $address,
         public string $neighborhood,
         public string $city,
         public string $state,
-        public string $zipCode,
-    ) {}
+        string $zipCode,
+    ) {
+        $this->zipCode = $this->onlyDigits($zipCode);
+    }
 
     /**
      * @return array{address: string, neighborhood: string, city: string, state: string, zip_code: string}
@@ -29,5 +33,10 @@ final readonly class Address
             'state' => $this->state,
             'zip_code' => $this->zipCode,
         ];
+    }
+
+    private function onlyDigits(string $value): string
+    {
+        return preg_replace('/\D+/', '', $value) ?? $value;
     }
 }

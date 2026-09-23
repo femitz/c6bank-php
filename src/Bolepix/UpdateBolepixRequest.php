@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Femitz\C6BankPhp\Bolepix;
 
 use DateTimeInterface;
+use Femitz\C6BankPhp\Exceptions\InvalidConfigurationException;
 
 /**
  * Dados para atualizar (PATCH) um bolepix já emitido. Todos os campos são
@@ -21,7 +22,11 @@ final readonly class UpdateBolepixRequest
         public ?Fees $fees = null,
         public ?PaymentMethod $paymentMethod = null,
         public ?string $origin = null,
-    ) {}
+    ) {
+        if ($this->amount !== null && $this->amount <= 1) {
+            throw InvalidConfigurationException::forInvalidValue('amount', 'deve ser maior que R$ 1,00.');
+        }
+    }
 
     /**
      * @return array<string, mixed>

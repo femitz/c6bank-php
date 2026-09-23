@@ -106,3 +106,11 @@ it('rejects an external reference id with an invalid format', function (string $
     'lowercase' => ['01kp640rnsyxh9g41gr27rtawp'],
     'with-symbols' => ['test-6ab3eeacb2e6b5.1073'],
 ]);
+
+it('rejects an amount that is not greater than 1', function (float $amount): void {
+    new CreateBolepixRequest('01KP640RNSYXH9G41GR27RTAWP', $amount, '2026-12-30', makePayer());
+})->throws(InvalidConfigurationException::class, 'O campo "amount" é inválido: deve ser maior que R$ 1,00.')->with([
+    'zero' => [0.0],
+    'negative' => [-10.0],
+    'exactly one' => [1.0],
+]);

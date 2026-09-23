@@ -11,9 +11,11 @@ use Femitz\C6BankPhp\Exceptions\InvalidConfigurationException;
  */
 final readonly class Payer
 {
+    public string $taxId;
+
     public function __construct(
         public string $name,
-        public string $taxId,
+        string $taxId,
         public Address $address,
         public ?string $email = null,
     ) {
@@ -21,7 +23,9 @@ final readonly class Payer
             throw InvalidConfigurationException::forEmptyField('payer.name');
         }
 
-        if (trim($this->taxId) === '') {
+        $this->taxId = $this->onlyDigits($taxId);
+
+        if ($this->taxId === '') {
             throw InvalidConfigurationException::forEmptyField('payer.tax_id');
         }
     }
@@ -42,5 +46,10 @@ final readonly class Payer
         }
 
         return $data;
+    }
+
+    private function onlyDigits(string $value): string
+    {
+        return preg_replace('/\D+/', '', $value) ?? $value;
     }
 }

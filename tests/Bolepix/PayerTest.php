@@ -35,3 +35,16 @@ it('rejects an empty name', function (): void {
 it('rejects an empty tax id', function (): void {
     new Payer('José da Silva', '', makeAddress());
 })->throws(InvalidConfigurationException::class, 'O campo "payer.tax_id" não pode ser vazio.');
+
+it('strips non-digit characters from the tax id', function (string $taxId, string $expected): void {
+    $payer = new Payer('José da Silva', $taxId, makeAddress());
+
+    expect($payer->taxId)->toBe($expected);
+})->with([
+    'CPF formatado' => ['123.456.789-10', '12345678910'],
+    'CNPJ formatado' => ['12.345.678/0001-95', '12345678000195'],
+]);
+
+it('rejects a tax id with only non-digit characters', function (): void {
+    new Payer('José da Silva', '---', makeAddress());
+})->throws(InvalidConfigurationException::class, 'O campo "payer.tax_id" não pode ser vazio.');
