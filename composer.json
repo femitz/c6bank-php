@@ -1,0 +1,62 @@
+{
+    "name": "femitz/c6bank-php",
+    "description": "Uma biblioteca PHP para integração com a API do C6 Bank",
+    "keywords": ["php", "c6bank", "api", "banking", "pix"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Felipe Schmitz",
+            "email": "schmitzdz14@gmail.com"
+        }
+    ],
+    "require": {
+        "php": "^8.5.0"
+    },
+    "require-dev": {
+        "laravel/pint": "^1.29.3",
+        "pestphp/pest": "^5.0.0",
+        "pestphp/pest-plugin-phpstan": "^5.0.0",
+        "pestphp/pest-plugin-rector": "^5.0.0",
+        "pestphp/pest-plugin-type-coverage": "^5.0.0",
+        "phpstan/phpstan": "^2.2.5",
+        "rector/rector": "^2.5.7",
+        "symfony/var-dumper": "^8.1.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Femitz\\C6BankPhp\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "preferred-install": "dist",
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "lint": [
+            "pint --parallel",
+            "rector"
+        ],
+        "test:type-coverage": "pest --type-coverage --min=100",
+        "test:lint": [
+            "pint --parallel --test",
+            "rector --dry-run"
+        ],
+        "test:unit": "pest --parallel --coverage --exactly=100",
+        "test:types": "phpstan",
+        "test": [
+            "@test:lint",
+            "@test:types",
+            "@test:unit"
+        ]
+    }
+}
