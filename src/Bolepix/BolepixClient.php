@@ -25,6 +25,8 @@ final readonly class BolepixClient
 
     private const string PDF_PATH = '/v2/bank_slips/%s/pdf';
 
+    private const string CANCEL_PATH = '/v2/bank_slips/%s/cancel';
+
     /**
      * Carteira de cobrança (`billing_scheme`) padrão por ambiente, usada
      * quando o chamador não informa uma explicitamente via
@@ -158,6 +160,31 @@ final readonly class BolepixClient
         }
 
         return $pdf;
+    }
+
+    /**
+     * Cancela um bolepix já emitido, a partir do `external_reference_id`
+     * informado na emissão.
+     */
+    public function cancel(string $externalReferenceId): void
+    {
+        if (trim($externalReferenceId) === '') {
+            throw InvalidConfigurationException::forEmptyField('external_reference_id');
+        }
+
+        try {
+            $this->httpClient->request('PUT', sprintf(self::CANCEL_PATH, rawurlencode($externalReferenceId)), [
+                'headers' => [
+                    'Authorization' => $this->authClient->getAccessToken()->authorizationHeader(),
+                    'partner-software-name' => $this->partnerSoftware->name,
+                    'partner-software-version' => $this->partnerSoftware->version,
+                ],
+            ]);
+        } catch (ConnectException $exception) {
+            throw NetworkException::fromConnectException($exception);
+        } catch (RequestException $exception) {
+            throw ApiException::fromRequestException($exception);
+        }
     }
 
     private function defaultBillingScheme(): ?string

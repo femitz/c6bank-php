@@ -162,6 +162,12 @@ $request = new UpdateBolepixRequest(
 $bolepix = $client->bolepix()->update('seu-id-de-referencia', $request);
 ```
 
+Para cancelar um bolepix já emitido:
+
+```php
+$client->bolepix()->cancel('seu-id-de-referencia');
+```
+
 > Documentação de uso detalhada será adicionada conforme os demais recursos da API
 > (Pix, extratos, etc.) forem implementados.
 

@@ -613,3 +613,61 @@ it('throws NetworkException when updating a bolepix fails to connect', function 
 
     $bolepixClient->update('01KP640RNSYXH9G41GR27RTAWP', new UpdateBolepixRequest(amount: 200));
 })->throws(NetworkException::class);
+
+it('cancels a bolepix', function (): void {
+    $mocked = makeBolepixClient([
+        new Response(204),
+    ]);
+
+    $mocked['bolepix']->cancel('01KP640RNSYXH9G41GR27RTAWP');
+
+    $request = $mocked['requests'][1];
+
+    expect($request->getMethod())->toBe('PUT')
+        ->and((string) $request->getUri())->toContain('/v2/bank_slips/01KP640RNSYXH9G41GR27RTAWP/cancel')
+        ->and($request->getHeaderLine('Authorization'))->toBe('Bearer test-token')
+        ->and($request->getHeaderLine('partner-software-name'))->toBe('Test Suite')
+        ->and($request->getHeaderLine('partner-software-version'))->toBe('1.0.0');
+});
+
+it('rejects an empty external reference id when cancelling a bolepix', function (): void {
+    $mocked = makeBolepixClient([]);
+
+    $mocked['bolepix']->cancel('');
+})->throws(InvalidConfigurationException::class);
+
+it('throws ApiException when cancelling a bolepix returns an http error', function (): void {
+    $mocked = makeBolepixClient([
+        new Response(404, [], json_encode([
+            'type' => 'https://developers.c6bank.com.br/v1/error/not_found',
+            'title' => 'Bolepix não encontrado.',
+            'status' => 404,
+        ], JSON_THROW_ON_ERROR)),
+    ]);
+
+    try {
+        $mocked['bolepix']->cancel('01KP640RNSYXH9G41GR27RTAWP');
+    } catch (ApiException $apiException) {
+        expect($apiException->statusCode)->toBe(404);
+
+        return;
+    }
+
+    $this->fail('Expected ApiException was not thrown.');
+});
+
+it('throws NetworkException when cancelling a bolepix fails to connect', function (): void {
+    $mocked = makeMockedHttpClient([
+        new Response(200, [], json_encode([
+            'access_token' => 'test-token',
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+        ], JSON_THROW_ON_ERROR)),
+        new ConnectException('Connection refused', new Request('PUT', '/v2/bank_slips/01KP640RNSYXH9G41GR27RTAWP/cancel')),
+    ]);
+
+    $authClient = new AuthClient($mocked['client'], new Credentials('client-id', 'client-secret'));
+    $bolepixClient = new BolepixClient($mocked['client'], $authClient, new PartnerSoftware('Test Suite', '1.0.0'));
+
+    $bolepixClient->cancel('01KP640RNSYXH9G41GR27RTAWP');
+})->throws(NetworkException::class);
