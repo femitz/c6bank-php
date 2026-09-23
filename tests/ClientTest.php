@@ -31,6 +31,14 @@ it('always exposes the same AuthClient instance', function (): void {
     expect($client->auth())->toBe($client->auth());
 });
 
+it('always exposes the same BolepixClient instance', function (): void {
+    $mocked = makeMockedHttpClient([]);
+
+    $client = new Client(makeConfig(), $mocked['client']);
+
+    expect($client->bolepix())->toBe($client->bolepix());
+});
+
 it('exposes the configured http client', function (): void {
     $mocked = makeMockedHttpClient([]);
 

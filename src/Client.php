@@ -6,6 +6,7 @@ namespace Femitz\C6BankPhp;
 
 use Femitz\C6BankPhp\Auth\AccessToken;
 use Femitz\C6BankPhp\Auth\AuthClient;
+use Femitz\C6BankPhp\Bolepix\BolepixClient;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\ClientInterface;
 
@@ -18,6 +19,8 @@ final readonly class Client
     private ClientInterface $httpClient;
 
     private AuthClient $auth;
+
+    private BolepixClient $bolepix;
 
     public function __construct(
         private Config $config,
@@ -34,11 +37,23 @@ final readonly class Client
             credentials: $this->config->credentials,
             safetyMarginSeconds: $this->config->tokenSafetyMarginSeconds,
         );
+
+        $this->bolepix = new BolepixClient(
+            httpClient: $this->httpClient,
+            authClient: $this->auth,
+            partnerSoftware: $this->config->partnerSoftware,
+            environment: $this->config->environment,
+        );
     }
 
     public function auth(): AuthClient
     {
         return $this->auth;
+    }
+
+    public function bolepix(): BolepixClient
+    {
+        return $this->bolepix;
     }
 
     public function getAccessToken(): AccessToken

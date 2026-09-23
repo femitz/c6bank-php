@@ -12,9 +12,15 @@ final readonly class Config
 {
     public string $baseUrl;
 
+    /**
+     * Nulo quando `$environment` é uma URL customizada (não um case do enum).
+     */
+    public ?Environment $environment;
+
     public function __construct(
         public Credentials $credentials,
         public Certificate $certificate,
+        public PartnerSoftware $partnerSoftware,
         Environment|string $environment = Environment::Sandbox,
         public int $tokenSafetyMarginSeconds = 30,
     ) {
@@ -25,5 +31,6 @@ final readonly class Config
         }
 
         $this->baseUrl = $baseUrl;
+        $this->environment = $environment instanceof Environment ? $environment : null;
     }
 }

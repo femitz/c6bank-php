@@ -11,7 +11,7 @@ final class NetworkException extends C6BankException
     public static function fromConnectException(ConnectException $exception): self
     {
         return new self(
-            message: sprintf('Falha de conexão ao autenticar com o C6 Bank: %s', $exception->getMessage()),
+            message: sprintf('Falha de conexão com o C6 Bank: %s', $exception->getMessage()),
             previous: $exception,
         );
     }

@@ -10,4 +10,9 @@ class InvalidConfigurationException extends C6BankException
     {
         return new self(sprintf('O campo "%s" não pode ser vazio.', $field));
     }
+
+    public static function forInvalidValue(string $field, string $reason): self
+    {
+        return new self(sprintf('O campo "%s" é inválido: %s', $field, $reason));
+    }
 }

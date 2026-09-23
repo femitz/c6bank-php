@@ -34,6 +34,7 @@ A API do C6 Bank (BaaS) utiliza o fluxo OAuth2 `client_credentials` combinado co
 use Femitz\C6BankPhp\Client;
 use Femitz\C6BankPhp\Config;
 use Femitz\C6BankPhp\Environment;
+use Femitz\C6BankPhp\PartnerSoftware;
 use Femitz\C6BankPhp\Auth\Certificate;
 use Femitz\C6BankPhp\Auth\Credentials;
 
@@ -48,6 +49,10 @@ $config = new Config(
         // certPassword: 'opcional',
         // keyPassword: 'opcional',
     ),
+    partnerSoftware: new PartnerSoftware(
+        name: 'Nome do seu software',
+        version: '1.0.0',
+    ),
     environment: Environment::Sandbox, // ou Environment::Production
 );
 
@@ -58,8 +63,58 @@ $token = $client->getAccessToken(); // reaproveitado em memória até expirar
 echo $token->authorizationHeader(); // "Bearer eyJ..."
 ```
 
+### Bolepix (emissão de boleto híbrido com Pix)
+
+```php
+use Femitz\C6BankPhp\Bolepix\Address;
+use Femitz\C6BankPhp\Bolepix\CreateBolepixRequest;
+use Femitz\C6BankPhp\Bolepix\Fees;
+use Femitz\C6BankPhp\Bolepix\Payer;
+use Femitz\C6BankPhp\Bolepix\PaymentMethod;
+use Femitz\C6BankPhp\Bolepix\PixOptions;
+
+$request = new CreateBolepixRequest(
+    externalReferenceId: 'seu-id-de-referencia',
+    amount: 150.00,
+    dueDate: '2026-12-30', // ou uma instância de DateTimeInterface
+    payer: new Payer(
+        name: 'José da Silva',
+        taxId: '12345678910',
+        address: new Address(
+            address: 'Av. Nove de Julho, 3186',
+            neighborhood: 'Jardim Paulista',
+            city: 'São Paulo',
+            state: 'SP',
+            zipCode: '01406000',
+        ),
+        email: 'pagador@email.com.br',
+    ),
+    description: 'Mensalidade referente a Junho/2026',
+    daysAfterDueDate: 10,
+    fees: new Fees(
+        fineValue: 10,
+        fineDeadline: 1,
+        fineType: 'FIXED_VALUE',
+        interestValue: 0.33,
+        interestDeadline: 1,
+        interestType: 'VALUE_PER_DAY',
+    ),
+    paymentMethod: new PaymentMethod(
+        pix: new PixOptions(
+            key: '123e4567-e89b-12d3-a456-426614174000',
+            type: 'EVP',
+        ),
+    ),
+);
+
+$bolepix = $client->bolepix()->create($request);
+
+echo $bolepix->bankSlip?->digitableLine;
+echo $bolepix->pix?->qrCode;
+```
+
 > Documentação de uso detalhada será adicionada conforme os demais recursos da API
-> (Pix, boletos, extratos, etc.) forem implementados.
+> (Pix, extratos, etc.) forem implementados.
 
 ## 🧪 Desenvolvimento
 

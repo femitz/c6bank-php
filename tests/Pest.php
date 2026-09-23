@@ -5,11 +5,14 @@ declare(strict_types=1);
 use Femitz\C6BankPhp\Auth\AuthClient;
 use Femitz\C6BankPhp\Auth\Certificate;
 use Femitz\C6BankPhp\Auth\Credentials;
+use Femitz\C6BankPhp\Bolepix\BolepixClient;
 use Femitz\C6BankPhp\Config;
 use Femitz\C6BankPhp\Environment;
+use Femitz\C6BankPhp\PartnerSoftware;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ResponseInterface;
 
@@ -77,7 +80,40 @@ function makeConfig(Environment|string $environment = Environment::Sandbox, int 
     return new Config(
         credentials: new Credentials('client-id', 'client-secret'),
         certificate: new Certificate($files['cert'], $files['key']),
+        partnerSoftware: new PartnerSoftware('Test Suite', '1.0.0'),
         environment: $environment,
         tokenSafetyMarginSeconds: $tokenSafetyMarginSeconds,
     );
+}
+
+/**
+ * Monta um BolepixClient mockado. A primeira resposta da fila é sempre a
+ * autenticação (disparada automaticamente pelo AuthClient), então
+ * `$queue` deve conter apenas as respostas para as chamadas ao bolepix,
+ * e `requests[0]` sempre será a requisição de auth.
+ *
+ * @param  array<int, ResponseInterface|Throwable>  $queue
+ * @return array{bolepix: BolepixClient, requests: array<int, RequestInterface>}
+ */
+function makeBolepixClient(array $queue, ?Environment $environment = Environment::Sandbox): array
+{
+    $mocked = makeMockedHttpClient([
+        new Response(200, [], json_encode([
+            'access_token' => 'test-token',
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+        ], JSON_THROW_ON_ERROR)),
+        ...$queue,
+    ]);
+
+    $authClient = new AuthClient($mocked['client'], new Credentials('client-id', 'client-secret'));
+
+    $bolepixClient = new BolepixClient(
+        httpClient: $mocked['client'],
+        authClient: $authClient,
+        partnerSoftware: new PartnerSoftware('Test Suite', '1.0.0'),
+        environment: $environment,
+    );
+
+    return ['bolepix' => $bolepixClient, 'requests' => &$mocked['requests']];
 }
