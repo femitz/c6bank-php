@@ -23,6 +23,8 @@ final readonly class BolepixClient
 
     private const string GET_PATH = '/v2/bank_slips/%s';
 
+    private const string PDF_PATH = '/v2/bank_slips/%s/pdf';
+
     /**
      * Carteira de cobrança (`billing_scheme`) padrão por ambiente, usada
      * quando o chamador não informa uma explicitamente via
@@ -94,6 +96,39 @@ final readonly class BolepixClient
         }
 
         return $this->parseBolepixResponse($response);
+    }
+
+    /**
+     * Baixa o PDF do boleto já emitido, a partir do `external_reference_id`
+     * informado na emissão. Retorna o conteúdo binário do arquivo.
+     */
+    public function getPdf(string $externalReferenceId): string
+    {
+        if (trim($externalReferenceId) === '') {
+            throw InvalidConfigurationException::forEmptyField('external_reference_id');
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', sprintf(self::PDF_PATH, rawurlencode($externalReferenceId)), [
+                'headers' => [
+                    'Authorization' => $this->authClient->getAccessToken()->authorizationHeader(),
+                    'partner-software-name' => $this->partnerSoftware->name,
+                    'partner-software-version' => $this->partnerSoftware->version,
+                ],
+            ]);
+        } catch (ConnectException $exception) {
+            throw NetworkException::fromConnectException($exception);
+        } catch (RequestException $exception) {
+            throw ApiException::fromRequestException($exception);
+        }
+
+        $pdf = (string) $response->getBody();
+
+        if (! str_starts_with($pdf, '%PDF-')) {
+            throw MalformedResponseException::forReason('corpo da resposta não é um PDF válido.');
+        }
+
+        return $pdf;
     }
 
     private function defaultBillingScheme(): ?string

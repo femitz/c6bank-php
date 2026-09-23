@@ -122,6 +122,14 @@ echo $bolepix->status;
 echo $bolepix->payer?->name;
 ```
 
+Para baixar o PDF do boleto:
+
+```php
+$pdf = $client->bolepix()->getPdf('seu-id-de-referencia');
+
+file_put_contents('boleto.pdf', $pdf);
+```
+
 > Documentação de uso detalhada será adicionada conforme os demais recursos da API
 > (Pix, extratos, etc.) forem implementados.
 

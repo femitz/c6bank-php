@@ -474,3 +474,71 @@ it('throws MalformedResponseException when days_after_due_date has the wrong typ
 
     $mocked['bolepix']->get('01KP640RNSYXH9G41GR27RTAWP');
 })->throws(MalformedResponseException::class);
+
+it('downloads the bolepix pdf', function (): void {
+    $mocked = makeBolepixClient([
+        new Response(200, [], "%PDF-1.4\n%fake-pdf-content"),
+    ]);
+
+    $pdf = $mocked['bolepix']->getPdf('01KP640RNSYXH9G41GR27RTAWP');
+
+    expect($pdf)->toContain('%PDF-1.4');
+
+    $request = $mocked['requests'][1];
+
+    expect($request->getMethod())->toBe('GET')
+        ->and((string) $request->getUri())->toContain('/v2/bank_slips/01KP640RNSYXH9G41GR27RTAWP/pdf')
+        ->and($request->getHeaderLine('Authorization'))->toBe('Bearer test-token')
+        ->and($request->getHeaderLine('partner-software-name'))->toBe('Test Suite')
+        ->and($request->getHeaderLine('partner-software-version'))->toBe('1.0.0');
+});
+
+it('rejects an empty external reference id when downloading the pdf', function (): void {
+    $mocked = makeBolepixClient([]);
+
+    $mocked['bolepix']->getPdf('');
+})->throws(InvalidConfigurationException::class);
+
+it('throws ApiException when downloading the pdf returns an http error', function (): void {
+    $mocked = makeBolepixClient([
+        new Response(404, [], json_encode([
+            'type' => 'https://developers.c6bank.com.br/v1/error/not_found',
+            'title' => 'Bolepix não encontrado.',
+            'status' => 404,
+        ], JSON_THROW_ON_ERROR)),
+    ]);
+
+    try {
+        $mocked['bolepix']->getPdf('01KP640RNSYXH9G41GR27RTAWP');
+    } catch (ApiException $apiException) {
+        expect($apiException->statusCode)->toBe(404);
+
+        return;
+    }
+
+    $this->fail('Expected ApiException was not thrown.');
+});
+
+it('throws NetworkException when downloading the pdf fails to connect', function (): void {
+    $mocked = makeMockedHttpClient([
+        new Response(200, [], json_encode([
+            'access_token' => 'test-token',
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+        ], JSON_THROW_ON_ERROR)),
+        new ConnectException('Connection refused', new Request('GET', '/v2/bank_slips/01KP640RNSYXH9G41GR27RTAWP/pdf')),
+    ]);
+
+    $authClient = new AuthClient($mocked['client'], new Credentials('client-id', 'client-secret'));
+    $bolepixClient = new BolepixClient($mocked['client'], $authClient, new PartnerSoftware('Test Suite', '1.0.0'));
+
+    $bolepixClient->getPdf('01KP640RNSYXH9G41GR27RTAWP');
+})->throws(NetworkException::class);
+
+it('throws MalformedResponseException when the pdf response is not a pdf', function (): void {
+    $mocked = makeBolepixClient([
+        new Response(200, [], '{"not":"a pdf"}'),
+    ]);
+
+    $mocked['bolepix']->getPdf('01KP640RNSYXH9G41GR27RTAWP');
+})->throws(MalformedResponseException::class);
