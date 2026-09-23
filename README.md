@@ -113,6 +113,15 @@ echo $bolepix->bankSlip?->digitableLine;
 echo $bolepix->pix?->qrCode;
 ```
 
+Para consultar um bolepix já emitido, use o mesmo `external_reference_id` informado na criação:
+
+```php
+$bolepix = $client->bolepix()->get('seu-id-de-referencia');
+
+echo $bolepix->status;
+echo $bolepix->payer?->name;
+```
+
 > Documentação de uso detalhada será adicionada conforme os demais recursos da API
 > (Pix, extratos, etc.) forem implementados.
 

@@ -16,5 +16,12 @@ final readonly class Bolepix
         public string $dueDate,
         public ?BankSlipDetails $bankSlip,
         public ?PixDetails $pix,
+        public ?string $emissionDate = null,
+        public ?string $description = null,
+        public ?int $daysAfterDueDate = null,
+        public ?string $status = null,
+        public ?Payer $payer = null,
+        public ?Fees $fees = null,
+        public ?string $origin = null,
     ) {}
 }

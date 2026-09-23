@@ -12,6 +12,7 @@ use Femitz\C6BankPhp\Bolepix\Payer;
 use Femitz\C6BankPhp\Bolepix\PaymentMethod;
 use Femitz\C6BankPhp\Environment;
 use Femitz\C6BankPhp\Exceptions\ApiException;
+use Femitz\C6BankPhp\Exceptions\InvalidConfigurationException;
 use Femitz\C6BankPhp\Exceptions\MalformedResponseException;
 use Femitz\C6BankPhp\Exceptions\NetworkException;
 use Femitz\C6BankPhp\PartnerSoftware;
@@ -295,4 +296,181 @@ it('throws MalformedResponseException when a pix field is invalid', function ():
     ]);
 
     $mocked['bolepix']->create(makeCreateBolepixRequest());
+})->throws(MalformedResponseException::class);
+
+it('fetches a bolepix and parses the full response, including payer and fees', function (): void {
+    $body = bolepixResponseBody();
+    $body['emission_date'] = '2026-06-15';
+    $body['description'] = 'Mensalidade referente a Junho/2026';
+    $body['days_after_due_date'] = 10;
+    $body['status'] = 'CREATED';
+    $body['origin'] = 'e-commerce';
+    $body['payer'] = [
+        'name' => 'José da Silva',
+        'tax_id' => '12345678910',
+        'email' => 'pagador@email.com.br',
+        'address' => [
+            'address' => 'Av. Nove de Julho, 3186',
+            'neighborhood' => 'Jardim Paulista',
+            'city' => 'São Paulo',
+            'state' => 'SP',
+            'zip_code' => '01406000',
+        ],
+    ];
+    $body['fees'] = [
+        'fine_value' => 10,
+        'fine_deadline' => 1,
+        'fine_type' => 'FIXED_VALUE',
+        'interest_value' => 0.33,
+        'interest_deadline' => 1,
+        'interest_type' => 'VALUE_PER_DAY',
+        'discount_type' => 'VALUE_PER_DAY',
+        'first_discount_value' => 5,
+        'first_discount_deadline' => 10,
+    ];
+
+    $mocked = makeBolepixClient([
+        new Response(200, [], json_encode($body, JSON_THROW_ON_ERROR)),
+    ]);
+
+    $bolepix = $mocked['bolepix']->get('01KP640RNSYXH9G41GR27RTAWP');
+
+    expect($bolepix->id)->toBe('01HVSBSTN8CCTCTEQT6MC7TD4B')
+        ->and($bolepix->emissionDate)->toBe('2026-06-15')
+        ->and($bolepix->description)->toBe('Mensalidade referente a Junho/2026')
+        ->and($bolepix->daysAfterDueDate)->toBe(10)
+        ->and($bolepix->status)->toBe('CREATED')
+        ->and($bolepix->origin)->toBe('e-commerce')
+        ->and($bolepix->payer?->name)->toBe('José da Silva')
+        ->and($bolepix->payer?->taxId)->toBe('12345678910')
+        ->and($bolepix->payer?->email)->toBe('pagador@email.com.br')
+        ->and($bolepix->payer?->address->zipCode)->toBe('01406000')
+        ->and($bolepix->fees?->fineValue)->toBe(10.0)
+        ->and($bolepix->fees?->interestValue)->toBe(0.33)
+        ->and($bolepix->fees?->fineType)->toBe('FIXED_VALUE');
+
+    $request = $mocked['requests'][1];
+
+    expect($request->getMethod())->toBe('GET')
+        ->and((string) $request->getUri())->toContain('/v2/bank_slips/01KP640RNSYXH9G41GR27RTAWP')
+        ->and($request->getHeaderLine('Authorization'))->toBe('Bearer test-token')
+        ->and($request->getHeaderLine('partner-software-name'))->toBe('Test Suite')
+        ->and($request->getHeaderLine('partner-software-version'))->toBe('1.0.0');
+});
+
+it('rejects an empty external reference id when fetching a bolepix', function (): void {
+    $mocked = makeBolepixClient([]);
+
+    $mocked['bolepix']->get('');
+})->throws(InvalidConfigurationException::class);
+
+it('throws ApiException when fetching a bolepix returns an http error', function (): void {
+    $mocked = makeBolepixClient([
+        new Response(404, [], json_encode([
+            'type' => 'https://developers.c6bank.com.br/v1/error/not_found',
+            'title' => 'Bolepix não encontrado.',
+            'status' => 404,
+        ], JSON_THROW_ON_ERROR)),
+    ]);
+
+    try {
+        $mocked['bolepix']->get('01KP640RNSYXH9G41GR27RTAWP');
+    } catch (ApiException $apiException) {
+        expect($apiException->statusCode)->toBe(404);
+
+        return;
+    }
+
+    $this->fail('Expected ApiException was not thrown.');
+});
+
+it('throws NetworkException when fetching a bolepix fails to connect', function (): void {
+    $mocked = makeMockedHttpClient([
+        new Response(200, [], json_encode([
+            'access_token' => 'test-token',
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+        ], JSON_THROW_ON_ERROR)),
+        new ConnectException('Connection refused', new Request('GET', '/v2/bank_slips/01KP640RNSYXH9G41GR27RTAWP')),
+    ]);
+
+    $authClient = new AuthClient($mocked['client'], new Credentials('client-id', 'client-secret'));
+    $bolepixClient = new BolepixClient($mocked['client'], $authClient, new PartnerSoftware('Test Suite', '1.0.0'));
+
+    $bolepixClient->get('01KP640RNSYXH9G41GR27RTAWP');
+})->throws(NetworkException::class);
+
+it('throws MalformedResponseException when the payer field is invalid', function (): void {
+    $body = bolepixResponseBody();
+    $body['payer'] = ['name' => 'José da Silva'];
+
+    $mocked = makeBolepixClient([
+        new Response(200, [], json_encode($body, JSON_THROW_ON_ERROR)),
+    ]);
+
+    $mocked['bolepix']->get('01KP640RNSYXH9G41GR27RTAWP');
+})->throws(MalformedResponseException::class);
+
+it('throws MalformedResponseException when the payer address field is invalid', function (): void {
+    $body = bolepixResponseBody();
+    $body['payer'] = [
+        'name' => 'José da Silva',
+        'tax_id' => '12345678910',
+        'address' => ['address' => 'Av. Nove de Julho, 3186'],
+    ];
+
+    $mocked = makeBolepixClient([
+        new Response(200, [], json_encode($body, JSON_THROW_ON_ERROR)),
+    ]);
+
+    $mocked['bolepix']->get('01KP640RNSYXH9G41GR27RTAWP');
+})->throws(MalformedResponseException::class);
+
+it('throws MalformedResponseException when a fees field is invalid', function (): void {
+    $body = bolepixResponseBody();
+    $body['fees'] = ['fine_value' => 'not-a-number'];
+
+    $mocked = makeBolepixClient([
+        new Response(200, [], json_encode($body, JSON_THROW_ON_ERROR)),
+    ]);
+
+    $mocked['bolepix']->get('01KP640RNSYXH9G41GR27RTAWP');
+})->throws(MalformedResponseException::class);
+
+it('throws MalformedResponseException when an optional top-level field has the wrong type', function (string $field): void {
+    $body = bolepixResponseBody();
+    $body[$field] = ['unexpected' => 'shape'];
+
+    $mocked = makeBolepixClient([
+        new Response(200, [], json_encode($body, JSON_THROW_ON_ERROR)),
+    ]);
+
+    $mocked['bolepix']->get('01KP640RNSYXH9G41GR27RTAWP');
+})->throws(MalformedResponseException::class)->with(['emission_date', 'description', 'status', 'origin']);
+
+it('parses a fees object with only some fields set', function (): void {
+    $body = bolepixResponseBody();
+    $body['fees'] = ['fine_type' => 'FIXED_VALUE'];
+
+    $mocked = makeBolepixClient([
+        new Response(200, [], json_encode($body, JSON_THROW_ON_ERROR)),
+    ]);
+
+    $bolepix = $mocked['bolepix']->get('01KP640RNSYXH9G41GR27RTAWP');
+
+    expect($bolepix->fees?->fineType)->toBe('FIXED_VALUE')
+        ->and($bolepix->fees?->fineValue)->toBeNull()
+        ->and($bolepix->fees?->interestValue)->toBeNull()
+        ->and($bolepix->fees?->firstDiscountValue)->toBeNull();
+});
+
+it('throws MalformedResponseException when days_after_due_date has the wrong type', function (): void {
+    $body = bolepixResponseBody();
+    $body['days_after_due_date'] = 'ten';
+
+    $mocked = makeBolepixClient([
+        new Response(200, [], json_encode($body, JSON_THROW_ON_ERROR)),
+    ]);
+
+    $mocked['bolepix']->get('01KP640RNSYXH9G41GR27RTAWP');
 })->throws(MalformedResponseException::class);

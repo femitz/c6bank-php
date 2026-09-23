@@ -7,6 +7,7 @@ namespace Femitz\C6BankPhp\Bolepix;
 use Femitz\C6BankPhp\Auth\AuthClient;
 use Femitz\C6BankPhp\Environment;
 use Femitz\C6BankPhp\Exceptions\ApiException;
+use Femitz\C6BankPhp\Exceptions\InvalidConfigurationException;
 use Femitz\C6BankPhp\Exceptions\MalformedResponseException;
 use Femitz\C6BankPhp\Exceptions\NetworkException;
 use Femitz\C6BankPhp\PartnerSoftware;
@@ -19,6 +20,8 @@ use Psr\Http\Message\ResponseInterface;
 final readonly class BolepixClient
 {
     private const string CREATE_PATH = '/v2/bank_slips';
+
+    private const string GET_PATH = '/v2/bank_slips/%s';
 
     /**
      * Carteira de cobrança (`billing_scheme`) padrão por ambiente, usada
@@ -56,6 +59,33 @@ final readonly class BolepixClient
                     'Content-Type' => 'application/json',
                 ],
                 'json' => $payload,
+            ]);
+        } catch (ConnectException $exception) {
+            throw NetworkException::fromConnectException($exception);
+        } catch (RequestException $exception) {
+            throw ApiException::fromRequestException($exception);
+        }
+
+        return $this->parseBolepixResponse($response);
+    }
+
+    /**
+     * Consulta um bolepix já emitido a partir do `external_reference_id`
+     * informado na emissão.
+     */
+    public function get(string $externalReferenceId): Bolepix
+    {
+        if (trim($externalReferenceId) === '') {
+            throw InvalidConfigurationException::forEmptyField('external_reference_id');
+        }
+
+        try {
+            $response = $this->httpClient->request('GET', sprintf(self::GET_PATH, rawurlencode($externalReferenceId)), [
+                'headers' => [
+                    'Authorization' => $this->authClient->getAccessToken()->authorizationHeader(),
+                    'partner-software-name' => $this->partnerSoftware->name,
+                    'partner-software-version' => $this->partnerSoftware->version,
+                ],
             ]);
         } catch (ConnectException $exception) {
             throw NetworkException::fromConnectException($exception);
@@ -146,6 +176,12 @@ final readonly class BolepixClient
             }
         }
 
+        $payerData = $decoded['payer'] ?? null;
+        $payer = is_array($payerData) ? $this->parsePayerDetails($payerData) : null;
+
+        $feesData = $decoded['fees'] ?? null;
+        $fees = is_array($feesData) ? $this->parseFeesDetails($feesData) : null;
+
         return new Bolepix(
             id: $id,
             externalReferenceId: $externalReferenceId,
@@ -153,6 +189,13 @@ final readonly class BolepixClient
             dueDate: $dueDate,
             bankSlip: $bankSlip,
             pix: $pix,
+            emissionDate: $this->parseOptionalString($decoded, 'emission_date'),
+            description: $this->parseOptionalString($decoded, 'description'),
+            daysAfterDueDate: $this->parseOptionalInt($decoded, 'days_after_due_date'),
+            status: $this->parseOptionalString($decoded, 'status'),
+            payer: $payer,
+            fees: $fees,
+            origin: $this->parseOptionalString($decoded, 'origin'),
         );
     }
 
@@ -206,5 +249,122 @@ final readonly class BolepixClient
             mimeType: $mimeType,
             reference: $reference,
         );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    private function parsePayerDetails(array $data): Payer
+    {
+        $name = $data['name'] ?? null;
+        $taxId = $data['tax_id'] ?? null;
+        $addressData = $data['address'] ?? null;
+
+        if (! is_string($name) || $name === '' || ! is_string($taxId) || $taxId === '' || ! is_array($addressData)) {
+            throw MalformedResponseException::forReason('campos de "payer" ausentes ou inválidos.');
+        }
+
+        return new Payer(
+            name: $name,
+            taxId: $taxId,
+            address: $this->parseAddressDetails($addressData),
+            email: $this->parseOptionalString($data, 'email'),
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    private function parseAddressDetails(array $data): Address
+    {
+        $address = $data['address'] ?? null;
+        $neighborhood = $data['neighborhood'] ?? null;
+        $city = $data['city'] ?? null;
+        $state = $data['state'] ?? null;
+        $zipCode = $data['zip_code'] ?? null;
+
+        if (! is_string($address) || ! is_string($neighborhood) || ! is_string($city) || ! is_string($state) || ! is_string($zipCode)) {
+            throw MalformedResponseException::forReason('campos de "payer.address" ausentes ou inválidos.');
+        }
+
+        return new Address(
+            address: $address,
+            neighborhood: $neighborhood,
+            city: $city,
+            state: $state,
+            zipCode: $zipCode,
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    private function parseFeesDetails(array $data): Fees
+    {
+        return new Fees(
+            fineValue: $this->parseOptionalFloat($data, 'fine_value'),
+            fineDeadline: $this->parseOptionalInt($data, 'fine_deadline'),
+            fineType: $this->parseOptionalString($data, 'fine_type'),
+            interestValue: $this->parseOptionalFloat($data, 'interest_value'),
+            interestDeadline: $this->parseOptionalInt($data, 'interest_deadline'),
+            interestType: $this->parseOptionalString($data, 'interest_type'),
+            discountType: $this->parseOptionalString($data, 'discount_type'),
+            firstDiscountValue: $this->parseOptionalFloat($data, 'first_discount_value'),
+            firstDiscountDeadline: $this->parseOptionalInt($data, 'first_discount_deadline'),
+        );
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    private function parseOptionalString(array $data, string $field): ?string
+    {
+        $value = $data[$field] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (! is_string($value)) {
+            throw MalformedResponseException::forReason(sprintf('campo "%s" inválido.', $field));
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    private function parseOptionalInt(array $data, string $field): ?int
+    {
+        $value = $data[$field] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (! is_int($value)) {
+            throw MalformedResponseException::forReason(sprintf('campo "%s" inválido.', $field));
+        }
+
+        return $value;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     */
+    private function parseOptionalFloat(array $data, string $field): ?float
+    {
+        $value = $data[$field] ?? null;
+
+        if ($value === null) {
+            return null;
+        }
+
+        if (! is_int($value) && ! is_float($value)) {
+            throw MalformedResponseException::forReason(sprintf('campo "%s" inválido.', $field));
+        }
+
+        return (float) $value;
     }
 }
