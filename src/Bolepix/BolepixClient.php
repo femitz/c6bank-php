@@ -21,7 +21,7 @@ final readonly class BolepixClient
 {
     private const string CREATE_PATH = '/v2/bank_slips';
 
-    private const string GET_PATH = '/v2/bank_slips/%s';
+    private const string RESOURCE_PATH = '/v2/bank_slips/%s';
 
     private const string PDF_PATH = '/v2/bank_slips/%s/pdf';
 
@@ -82,12 +82,41 @@ final readonly class BolepixClient
         }
 
         try {
-            $response = $this->httpClient->request('GET', sprintf(self::GET_PATH, rawurlencode($externalReferenceId)), [
+            $response = $this->httpClient->request('GET', sprintf(self::RESOURCE_PATH, rawurlencode($externalReferenceId)), [
                 'headers' => [
                     'Authorization' => $this->authClient->getAccessToken()->authorizationHeader(),
                     'partner-software-name' => $this->partnerSoftware->name,
                     'partner-software-version' => $this->partnerSoftware->version,
                 ],
+            ]);
+        } catch (ConnectException $exception) {
+            throw NetworkException::fromConnectException($exception);
+        } catch (RequestException $exception) {
+            throw ApiException::fromRequestException($exception);
+        }
+
+        return $this->parseBolepixResponse($response);
+    }
+
+    /**
+     * Atualiza (PATCH) um bolepix já emitido. Apenas os campos informados em
+     * `$request` são enviados à API.
+     */
+    public function update(string $externalReferenceId, UpdateBolepixRequest $request): Bolepix
+    {
+        if (trim($externalReferenceId) === '') {
+            throw InvalidConfigurationException::forEmptyField('external_reference_id');
+        }
+
+        try {
+            $response = $this->httpClient->request('PATCH', sprintf(self::RESOURCE_PATH, rawurlencode($externalReferenceId)), [
+                'headers' => [
+                    'Authorization' => $this->authClient->getAccessToken()->authorizationHeader(),
+                    'partner-software-name' => $this->partnerSoftware->name,
+                    'partner-software-version' => $this->partnerSoftware->version,
+                    'Content-Type' => 'application/json',
+                ],
+                'json' => $request->toArray(),
             ]);
         } catch (ConnectException $exception) {
             throw NetworkException::fromConnectException($exception);

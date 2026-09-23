@@ -10,6 +10,7 @@ use Femitz\C6BankPhp\Bolepix\BolepixClient;
 use Femitz\C6BankPhp\Bolepix\CreateBolepixRequest;
 use Femitz\C6BankPhp\Bolepix\Payer;
 use Femitz\C6BankPhp\Bolepix\PaymentMethod;
+use Femitz\C6BankPhp\Bolepix\UpdateBolepixRequest;
 use Femitz\C6BankPhp\Environment;
 use Femitz\C6BankPhp\Exceptions\ApiException;
 use Femitz\C6BankPhp\Exceptions\InvalidConfigurationException;
@@ -542,3 +543,73 @@ it('throws MalformedResponseException when the pdf response is not a pdf', funct
 
     $mocked['bolepix']->getPdf('01KP640RNSYXH9G41GR27RTAWP');
 })->throws(MalformedResponseException::class);
+
+it('updates a bolepix and parses the response', function (): void {
+    $mocked = makeBolepixClient([
+        new Response(200, [], json_encode(bolepixResponseBody(), JSON_THROW_ON_ERROR)),
+    ]);
+
+    $request = new UpdateBolepixRequest(
+        amount: 200,
+        description: 'Nova descrição',
+    );
+
+    $bolepix = $mocked['bolepix']->update('01KP640RNSYXH9G41GR27RTAWP', $request);
+
+    expect($bolepix->id)->toBe('01HVSBSTN8CCTCTEQT6MC7TD4B');
+
+    $httpRequest = $mocked['requests'][1];
+
+    expect($httpRequest->getMethod())->toBe('PATCH')
+        ->and((string) $httpRequest->getUri())->toContain('/v2/bank_slips/01KP640RNSYXH9G41GR27RTAWP')
+        ->and($httpRequest->getHeaderLine('Authorization'))->toBe('Bearer test-token')
+        ->and($httpRequest->getHeaderLine('partner-software-name'))->toBe('Test Suite')
+        ->and($httpRequest->getHeaderLine('partner-software-version'))->toBe('1.0.0')
+        ->and($httpRequest->getHeaderLine('Content-Type'))->toBe('application/json')
+        ->and(decodedRequestBody($httpRequest))->toBe([
+            'amount' => 200,
+            'description' => 'Nova descrição',
+        ]);
+});
+
+it('rejects an empty external reference id when updating a bolepix', function (): void {
+    $mocked = makeBolepixClient([]);
+
+    $mocked['bolepix']->update('', new UpdateBolepixRequest(amount: 200));
+})->throws(InvalidConfigurationException::class);
+
+it('throws ApiException when updating a bolepix returns an http error', function (): void {
+    $mocked = makeBolepixClient([
+        new Response(422, [], json_encode([
+            'type' => 'https://developers.c6bank.com.br/v1/error/validation',
+            'title' => 'Requisição inválida.',
+            'status' => 422,
+        ], JSON_THROW_ON_ERROR)),
+    ]);
+
+    try {
+        $mocked['bolepix']->update('01KP640RNSYXH9G41GR27RTAWP', new UpdateBolepixRequest(amount: 200));
+    } catch (ApiException $apiException) {
+        expect($apiException->statusCode)->toBe(422);
+
+        return;
+    }
+
+    $this->fail('Expected ApiException was not thrown.');
+});
+
+it('throws NetworkException when updating a bolepix fails to connect', function (): void {
+    $mocked = makeMockedHttpClient([
+        new Response(200, [], json_encode([
+            'access_token' => 'test-token',
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+        ], JSON_THROW_ON_ERROR)),
+        new ConnectException('Connection refused', new Request('PATCH', '/v2/bank_slips/01KP640RNSYXH9G41GR27RTAWP')),
+    ]);
+
+    $authClient = new AuthClient($mocked['client'], new Credentials('client-id', 'client-secret'));
+    $bolepixClient = new BolepixClient($mocked['client'], $authClient, new PartnerSoftware('Test Suite', '1.0.0'));
+
+    $bolepixClient->update('01KP640RNSYXH9G41GR27RTAWP', new UpdateBolepixRequest(amount: 200));
+})->throws(NetworkException::class);

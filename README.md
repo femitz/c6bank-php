@@ -130,6 +130,38 @@ $pdf = $client->bolepix()->getPdf('seu-id-de-referencia');
 file_put_contents('boleto.pdf', $pdf);
 ```
 
+Para atualizar um bolepix já emitido (apenas os campos informados são enviados; note que, diferente da
+emissão, o `payer` aqui só aceita `email` e `address` — `name`/`tax_id` não podem ser alterados):
+
+```php
+use Femitz\C6BankPhp\Bolepix\BankSlipOptions;
+use Femitz\C6BankPhp\Bolepix\UpdateBolepixRequest;
+use Femitz\C6BankPhp\Bolepix\UpdatePayerOptions;
+
+$request = new UpdateBolepixRequest(
+    amount: 150.00,
+    dueDate: '2026-12-30',
+    description: 'Mensalidade referente a Junho/2026',
+    daysAfterDueDate: 30,
+    payer: new UpdatePayerOptions(
+        email: 'novo-email@email.com.br',
+    ),
+    fees: new Fees(
+        fineValue: 10,
+        fineType: 'FIXED_VALUE',
+    ),
+    paymentMethod: new PaymentMethod(
+        bankSlip: new BankSlipOptions(
+            yourNumber: '0000003048',
+            instructions: ['Não receber após o vencimento'],
+        ),
+    ),
+    origin: 'e-commerce',
+);
+
+$bolepix = $client->bolepix()->update('seu-id-de-referencia', $request);
+```
+
 > Documentação de uso detalhada será adicionada conforme os demais recursos da API
 > (Pix, extratos, etc.) forem implementados.
 
