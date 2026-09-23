@@ -25,7 +25,41 @@ composer require femitz/c6bank-php
 
 ## 🚀 Uso
 
-> Documentação de uso detalhada será adicionada conforme os recursos da API forem implementados.
+### Autenticação
+
+A API do C6 Bank (BaaS) utiliza o fluxo OAuth2 `client_credentials` combinado com **mTLS**
+(certificado cliente + chave privada), tanto no sandbox quanto — presumivelmente — em produção.
+
+```php
+use Femitz\C6BankPhp\Client;
+use Femitz\C6BankPhp\Config;
+use Femitz\C6BankPhp\Environment;
+use Femitz\C6BankPhp\Auth\Certificate;
+use Femitz\C6BankPhp\Auth\Credentials;
+
+$config = new Config(
+    credentials: new Credentials(
+        clientId: 'seu-client-id',
+        clientSecret: 'seu-client-secret',
+    ),
+    certificate: new Certificate(
+        certPath: '/caminho/para/certificado.crt',
+        keyPath: '/caminho/para/chave.key',
+        // certPassword: 'opcional',
+        // keyPassword: 'opcional',
+    ),
+    environment: Environment::Sandbox, // ou Environment::Production
+);
+
+$client = new Client($config);
+
+$token = $client->getAccessToken(); // reaproveitado em memória até expirar
+
+echo $token->authorizationHeader(); // "Bearer eyJ..."
+```
+
+> Documentação de uso detalhada será adicionada conforme os demais recursos da API
+> (Pix, boletos, extratos, etc.) forem implementados.
 
 ## 🧪 Desenvolvimento
 
