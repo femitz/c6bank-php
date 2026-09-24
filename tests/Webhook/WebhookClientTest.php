@@ -150,6 +150,59 @@ it('throws NetworkException when fetching a webhook fails to connect', function 
     $webhookClient->get(WebhookService::BankSlip);
 })->throws(NetworkException::class);
 
+it('deletes a registered webhook', function (): void {
+    $mocked = makeWebhookClient([
+        new Response(204),
+    ]);
+
+    $mocked['webhook']->delete(WebhookService::BankSlip);
+
+    $request = $mocked['requests'][1];
+
+    expect($request->getMethod())->toBe('DELETE')
+        ->and((string) $request->getUri())->toContain('/v1/webhooks/')
+        ->and((string) $request->getUri())->toContain('service=BANK_SLIP')
+        ->and($request->getHeaderLine('Authorization'))->toBe('Bearer test-token')
+        ->and($request->getHeaderLine('partner-software-name'))->toBe('Test Suite')
+        ->and($request->getHeaderLine('partner-software-version'))->toBe('1.0.0');
+});
+
+it('throws ApiException when deleting a webhook returns an http error', function (): void {
+    $mocked = makeWebhookClient([
+        new Response(404, [], json_encode([
+            'type' => 'https://developers.c6bank.com.br/v1/error/not_found',
+            'title' => 'Webhook não encontrado.',
+            'status' => 404,
+        ], JSON_THROW_ON_ERROR)),
+    ]);
+
+    try {
+        $mocked['webhook']->delete(WebhookService::BankSlip);
+    } catch (ApiException $apiException) {
+        expect($apiException->statusCode)->toBe(404);
+
+        return;
+    }
+
+    $this->fail('Expected ApiException was not thrown.');
+});
+
+it('throws NetworkException when deleting a webhook fails to connect', function (): void {
+    $mocked = makeMockedHttpClient([
+        new Response(200, [], json_encode([
+            'access_token' => 'test-token',
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+        ], JSON_THROW_ON_ERROR)),
+        new ConnectException('Connection refused', new Request('DELETE', '/v1/webhooks/')),
+    ]);
+
+    $authClient = new AuthClient($mocked['client'], new Credentials('client-id', 'client-secret'));
+    $webhookClient = new WebhookClient($mocked['client'], $authClient, new PartnerSoftware('Test Suite', '1.0.0'));
+
+    $webhookClient->delete(WebhookService::BankSlip);
+})->throws(NetworkException::class);
+
 it('rejects an empty url when registering a webhook', function (): void {
     new RegisterWebhookRequest(url: '');
 })->throws(InvalidConfigurationException::class);

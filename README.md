@@ -195,6 +195,12 @@ $webhook = $client->webhook()->get(WebhookService::BankSlip);
 echo $webhook->url;
 ```
 
+Para remover o webhook registrado para um serviço:
+
+```php
+$client->webhook()->delete(WebhookService::BankSlip);
+```
+
 > Documentação de uso detalhada será adicionada conforme os demais recursos da API
 > (Pix, extratos, etc.) forem implementados.
 

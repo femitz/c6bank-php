@@ -71,6 +71,29 @@ final readonly class WebhookClient
         return $this->parseWebhookResponse($response);
     }
 
+    /**
+     * Remove o webhook registrado para o serviço informado.
+     */
+    public function delete(WebhookService $service): void
+    {
+        try {
+            $this->httpClient->request('DELETE', self::REGISTER_PATH, [
+                'headers' => [
+                    'Authorization' => $this->authClient->getAccessToken()->authorizationHeader(),
+                    'partner-software-name' => $this->partnerSoftware->name,
+                    'partner-software-version' => $this->partnerSoftware->version,
+                ],
+                'query' => [
+                    'service' => $service->value,
+                ],
+            ]);
+        } catch (ConnectException $exception) {
+            throw NetworkException::fromConnectException($exception);
+        } catch (RequestException $exception) {
+            throw ApiException::fromRequestException($exception);
+        }
+    }
+
     private function parseWebhookResponse(ResponseInterface $response): Webhook
     {
         $body = (string) $response->getBody();
