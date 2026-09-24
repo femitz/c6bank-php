@@ -168,6 +168,57 @@ Para cancelar um bolepix já emitido:
 $client->bolepix()->cancel('seu-id-de-referencia');
 ```
 
+### Webhooks
+
+Para registrar um webhook de notificações (por padrão, para o serviço `BANK_SLIP`, usado pelo bolepix):
+
+```php
+use Femitz\C6BankPhp\Webhook\RegisterWebhookRequest;
+
+$request = new RegisterWebhookRequest(
+    url: 'https://www.meuendereco.com.br/webhook/xpto',
+);
+
+$webhook = $client->webhook()->register($request);
+
+echo $webhook->clientId;
+echo $webhook->createdAt;
+```
+
+Para consultar o webhook registrado para um serviço:
+
+```php
+use Femitz\C6BankPhp\Webhook\WebhookService;
+
+$webhook = $client->webhook()->get(WebhookService::BankSlip);
+
+echo $webhook->url;
+```
+
+Para remover o webhook registrado para um serviço:
+
+```php
+$client->webhook()->delete(WebhookService::BankSlip);
+```
+
+Para processar as notificações de bolepix recebidas no endereço registrado (o corpo bruto da
+requisição recebida em seu endpoint de webhook):
+
+```php
+use Femitz\C6BankPhp\Webhook\BolepixNotification;
+use Femitz\C6BankPhp\Webhook\BolepixNotificationStatus;
+
+$notification = BolepixNotification::fromJson($rawRequestBody);
+
+match ($notification->status) {
+    BolepixNotificationStatus::Created => // $notification->bolepix está preenchido
+        var_dump($notification->bolepix),
+    BolepixNotificationStatus::Paid,
+    BolepixNotificationStatus::WaitingConfirmation => // $notification->payment está preenchido
+        var_dump($notification->payment),
+};
+```
+
 > Documentação de uso detalhada será adicionada conforme os demais recursos da API
 > (Pix, extratos, etc.) forem implementados.
 
