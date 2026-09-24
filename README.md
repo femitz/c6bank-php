@@ -185,6 +185,16 @@ echo $webhook->clientId;
 echo $webhook->createdAt;
 ```
 
+Para consultar o webhook registrado para um serviço:
+
+```php
+use Femitz\C6BankPhp\Webhook\WebhookService;
+
+$webhook = $client->webhook()->get(WebhookService::BankSlip);
+
+echo $webhook->url;
+```
+
 > Documentação de uso detalhada será adicionada conforme os demais recursos da API
 > (Pix, extratos, etc.) forem implementados.
 

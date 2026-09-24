@@ -92,6 +92,64 @@ it('registers a webhook for a given service', function (WebhookService $service)
     expect(decodedWebhookRequestBody($request)['service'])->toBe($service->value);
 })->with([WebhookService::BankSlip, WebhookService::BankSlipPix, WebhookService::Checkout]);
 
+it('fetches a registered webhook and parses the response', function (): void {
+    $mocked = makeWebhookClient([
+        new Response(200, [], json_encode(webhookResponseBody(), JSON_THROW_ON_ERROR)),
+    ]);
+
+    $webhook = $mocked['webhook']->get(WebhookService::BankSlip);
+
+    expect($webhook->service)->toBe(WebhookService::BankSlip)
+        ->and($webhook->clientId)->toBe('6abeb8cd-3dda-4f3a-b038-3b55c9d87d6a')
+        ->and($webhook->url)->toBe('https://www.meuendereco.com.br/webhook/xpto')
+        ->and($webhook->createdAt)->toBe('2025-11-26T18:02:23.301232079Z');
+
+    $request = $mocked['requests'][1];
+
+    expect($request->getMethod())->toBe('GET')
+        ->and((string) $request->getUri())->toContain('/v1/webhooks/')
+        ->and((string) $request->getUri())->toContain('service=BANK_SLIP')
+        ->and($request->getHeaderLine('Authorization'))->toBe('Bearer test-token')
+        ->and($request->getHeaderLine('partner-software-name'))->toBe('Test Suite')
+        ->and($request->getHeaderLine('partner-software-version'))->toBe('1.0.0');
+});
+
+it('throws ApiException when fetching a webhook returns an http error', function (): void {
+    $mocked = makeWebhookClient([
+        new Response(404, [], json_encode([
+            'type' => 'https://developers.c6bank.com.br/v1/error/not_found',
+            'title' => 'Webhook não encontrado.',
+            'status' => 404,
+        ], JSON_THROW_ON_ERROR)),
+    ]);
+
+    try {
+        $mocked['webhook']->get(WebhookService::BankSlip);
+    } catch (ApiException $apiException) {
+        expect($apiException->statusCode)->toBe(404);
+
+        return;
+    }
+
+    $this->fail('Expected ApiException was not thrown.');
+});
+
+it('throws NetworkException when fetching a webhook fails to connect', function (): void {
+    $mocked = makeMockedHttpClient([
+        new Response(200, [], json_encode([
+            'access_token' => 'test-token',
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+        ], JSON_THROW_ON_ERROR)),
+        new ConnectException('Connection refused', new Request('GET', '/v1/webhooks/')),
+    ]);
+
+    $authClient = new AuthClient($mocked['client'], new Credentials('client-id', 'client-secret'));
+    $webhookClient = new WebhookClient($mocked['client'], $authClient, new PartnerSoftware('Test Suite', '1.0.0'));
+
+    $webhookClient->get(WebhookService::BankSlip);
+})->throws(NetworkException::class);
+
 it('rejects an empty url when registering a webhook', function (): void {
     new RegisterWebhookRequest(url: '');
 })->throws(InvalidConfigurationException::class);
