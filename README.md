@@ -201,6 +201,24 @@ Para remover o webhook registrado para um serviço:
 $client->webhook()->delete(WebhookService::BankSlip);
 ```
 
+Para processar as notificações de bolepix recebidas no endereço registrado (o corpo bruto da
+requisição recebida em seu endpoint de webhook):
+
+```php
+use Femitz\C6BankPhp\Webhook\BolepixNotification;
+use Femitz\C6BankPhp\Webhook\BolepixNotificationStatus;
+
+$notification = BolepixNotification::fromJson($rawRequestBody);
+
+match ($notification->status) {
+    BolepixNotificationStatus::Created => // $notification->bolepix está preenchido
+        var_dump($notification->bolepix),
+    BolepixNotificationStatus::Paid,
+    BolepixNotificationStatus::WaitingConfirmation => // $notification->payment está preenchido
+        var_dump($notification->payment),
+};
+```
+
 > Documentação de uso detalhada será adicionada conforme os demais recursos da API
 > (Pix, extratos, etc.) forem implementados.
 
