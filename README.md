@@ -168,6 +168,23 @@ Para cancelar um bolepix já emitido:
 $client->bolepix()->cancel('seu-id-de-referencia');
 ```
 
+### Webhooks
+
+Para registrar um webhook de notificações (por padrão, para o serviço `BANK_SLIP`, usado pelo bolepix):
+
+```php
+use Femitz\C6BankPhp\Webhook\RegisterWebhookRequest;
+
+$request = new RegisterWebhookRequest(
+    url: 'https://www.meuendereco.com.br/webhook/xpto',
+);
+
+$webhook = $client->webhook()->register($request);
+
+echo $webhook->clientId;
+echo $webhook->createdAt;
+```
+
 > Documentação de uso detalhada será adicionada conforme os demais recursos da API
 > (Pix, extratos, etc.) forem implementados.
 

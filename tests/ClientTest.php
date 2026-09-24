@@ -39,6 +39,14 @@ it('always exposes the same BolepixClient instance', function (): void {
     expect($client->bolepix())->toBe($client->bolepix());
 });
 
+it('always exposes the same WebhookClient instance', function (): void {
+    $mocked = makeMockedHttpClient([]);
+
+    $client = new Client(makeConfig(), $mocked['client']);
+
+    expect($client->webhook())->toBe($client->webhook());
+});
+
 it('exposes the configured http client', function (): void {
     $mocked = makeMockedHttpClient([]);
 

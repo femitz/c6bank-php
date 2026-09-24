@@ -7,6 +7,7 @@ namespace Femitz\C6BankPhp;
 use Femitz\C6BankPhp\Auth\AccessToken;
 use Femitz\C6BankPhp\Auth\AuthClient;
 use Femitz\C6BankPhp\Bolepix\BolepixClient;
+use Femitz\C6BankPhp\Webhook\WebhookClient;
 use GuzzleHttp\Client as GuzzleClient;
 use GuzzleHttp\ClientInterface;
 
@@ -21,6 +22,8 @@ final readonly class Client
     private AuthClient $auth;
 
     private BolepixClient $bolepix;
+
+    private WebhookClient $webhook;
 
     public function __construct(
         private Config $config,
@@ -44,6 +47,12 @@ final readonly class Client
             partnerSoftware: $this->config->partnerSoftware,
             environment: $this->config->environment,
         );
+
+        $this->webhook = new WebhookClient(
+            httpClient: $this->httpClient,
+            authClient: $this->auth,
+            partnerSoftware: $this->config->partnerSoftware,
+        );
     }
 
     public function auth(): AuthClient
@@ -54,6 +63,11 @@ final readonly class Client
     public function bolepix(): BolepixClient
     {
         return $this->bolepix;
+    }
+
+    public function webhook(): WebhookClient
+    {
+        return $this->webhook;
     }
 
     public function getAccessToken(): AccessToken

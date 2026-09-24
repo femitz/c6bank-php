@@ -9,6 +9,7 @@ use Femitz\C6BankPhp\Bolepix\BolepixClient;
 use Femitz\C6BankPhp\Config;
 use Femitz\C6BankPhp\Environment;
 use Femitz\C6BankPhp\PartnerSoftware;
+use Femitz\C6BankPhp\Webhook\WebhookClient;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
@@ -116,4 +117,35 @@ function makeBolepixClient(array $queue, ?Environment $environment = Environment
     );
 
     return ['bolepix' => $bolepixClient, 'requests' => &$mocked['requests']];
+}
+
+/**
+ * Monta um WebhookClient mockado. A primeira resposta da fila é sempre a
+ * autenticação (disparada automaticamente pelo AuthClient), então
+ * `$queue` deve conter apenas as respostas para as chamadas ao webhook,
+ * e `requests[0]` sempre será a requisição de auth.
+ *
+ * @param  array<int, ResponseInterface|Throwable>  $queue
+ * @return array{webhook: WebhookClient, requests: array<int, RequestInterface>}
+ */
+function makeWebhookClient(array $queue): array
+{
+    $mocked = makeMockedHttpClient([
+        new Response(200, [], json_encode([
+            'access_token' => 'test-token',
+            'token_type' => 'Bearer',
+            'expires_in' => 3600,
+        ], JSON_THROW_ON_ERROR)),
+        ...$queue,
+    ]);
+
+    $authClient = new AuthClient($mocked['client'], new Credentials('client-id', 'client-secret'));
+
+    $webhookClient = new WebhookClient(
+        httpClient: $mocked['client'],
+        authClient: $authClient,
+        partnerSoftware: new PartnerSoftware('Test Suite', '1.0.0'),
+    );
+
+    return ['webhook' => $webhookClient, 'requests' => &$mocked['requests']];
 }
